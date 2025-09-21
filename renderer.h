@@ -25,4 +25,4 @@ HRESULT InitDevice(HWND hWnd, SharedMemoryData& sharedMemoryData, float zoomFact
 void CleanupDevice();
 void Render(SharedMemoryData& sharedMemoryData);
 void Resize(UINT width, UINT height);
-void UpdateMeshes(SharedMemoryData& sharedMemoryData, float zoomFactor);
+void UpdateMeshes(SharedMemoryData& sharedMemoryData, float zoomFactor, bool useDistortion = true);

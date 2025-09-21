@@ -8,31 +8,31 @@ DirectX::XMFLOAT2 get_distorted_point(double x, double y, const CameraParameters
     double xSq = x * x;
     double ySq = y * y;
     double rSq = xSq + ySq;
-    double two_xy = 2.0 * x * y;
-    double rSq_p4 = rSq * rSq * rSq * rSq;
-    double rSq_p5 = rSq_p4 * rSq;
+    double twoXY = 2.0 * x * y;
+    double rSqP4 = rSq * rSq * rSq * rSq;
+    double rSqP5 = rSqP4 * rSq;
 
     double numPoly = 1.0 +
         (((p[4] * rSq + p[1]) * rSq + p[0]) * rSq) +
-        (p[16] * rSq_p5 * rSq) +
-        (p[15] * rSq_p5) +
-        (p[14] * rSq_p4);
+        (p[16] * rSqP5 * rSq) +
+        (p[15] * rSqP5) +
+        (p[14] * rSqP4);
 
     double denPoly = 1.0 +
         (((p[7] * rSq + p[6]) * rSq + p[5]) * rSq) +
-        (p[19] * rSq_p5 * rSq) +
-        (p[18] * rSq_p5) +
-        (p[17] * rSq_p4);
+        (p[19] * rSqP5 * rSq) +
+        (p[18] * rSqP5) +
+        (p[17] * rSqP4);
 
     double radialScale = (abs(denPoly) > 1e-9) ? (numPoly / denPoly) : 1.0;
 
     double distortedXTerm = (((p[9] * rSq + p[8]) * rSq)) +
                              ((xSq + xSq + rSq) * p[3]) +
                              (radialScale * x) +
-                             (two_xy * p[2]);
+                             (twoXY * p[2]);
 
     double distortedYTerm = (((p[11] * rSq + p[10]) * rSq)) +
-                             (two_xy * p[3]) +
+                             (twoXY * p[3]) +
                              ((ySq + ySq + rSq) * p[2]) +
                              (radialScale * y);
 
@@ -111,4 +111,21 @@ void create_undistortion_mesh(
             outIndices.push_back(bottomRight);
         }
     }
+}
+
+void create_default_mesh(std::vector<UndistortVertex>& outVertices, std::vector<DWORD>& outIndices) {
+    outVertices.clear();
+    outIndices.clear();
+
+    outVertices.push_back({ {-1.0f, 1.0f, 0.0f}, {0.0f, 0.0f} });
+    outVertices.push_back({ {1.0f, 1.0f, 0.0f}, {1.0f, 0.0f} });
+    outVertices.push_back({ {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f} });
+    outVertices.push_back({ {1.0f, -1.0f, 0.0f}, {1.0f, 1.0f} });
+
+    outIndices.push_back(0);
+    outIndices.push_back(1);
+    outIndices.push_back(2);
+    outIndices.push_back(2);
+    outIndices.push_back(1);
+    outIndices.push_back(3);
 }

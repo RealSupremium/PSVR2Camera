@@ -7,6 +7,7 @@
 
 SharedMemoryData sharedMemoryData;
 float zoomFactor = 2.0f;
+bool useDistortion = true;
 
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -30,6 +31,12 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case VK_OEM_PLUS:
                     zoomFactor += 0.1f;
                     UpdateMeshes(sharedMemoryData, zoomFactor);
+                    break;
+                case 'D':
+                    useDistortion = !useDistortion;
+                    UpdateMeshes(sharedMemoryData, zoomFactor, useDistortion);
+                    break;
+                default:
                     break;
             }
             return 0;

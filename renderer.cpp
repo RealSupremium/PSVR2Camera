@@ -6,8 +6,8 @@
 using Microsoft::WRL::ComPtr;
 
 const int IMAGE_WIDTH = 1016 * 2; // Changed to double width
-const int IMAGE_HEIGHT = 1016;
-const size_t BC4_DATA_SIZE = (1016 * 1016) / 2; // BC4 is 4 bits per pixel
+const int IMAGE_HEIGHT = 1024;
+const size_t BC4_DATA_SIZE = (1016 * 1024) / 2; // BC4 is 4 bits per pixel
 
 DisplayMode g_displayMode = DisplayMode::SideBySide;
 
@@ -21,16 +21,12 @@ ComPtr<ID3D11Texture2D>          g_pBC4Texture2;
 ComPtr<ID3D11ShaderResourceView> g_pBC4TextureSRV2;
 ComPtr<ID3D11SamplerState>       g_pSamplerState;
 
-ComPtr<ID3D11Buffer>             g_pUndistortVertexBuffer;
-ComPtr<ID3D11Buffer>             g_pUndistortIndexBuffer;
+ComPtr<ID3D11Buffer>             g_pUndistortVertexBuffer[2];
+ComPtr<ID3D11Buffer>             g_pUndistortIndexBuffer[2];
 ComPtr<ID3D11VertexShader>       g_pUndistortVertexShader;
 ComPtr<ID3D11PixelShader>        g_pUndistortPixelShader;
 ComPtr<ID3D11InputLayout>        g_pUndistortInputLayout;
-UINT                             g_uUndistortIndexCount = 0;
-
-ComPtr<ID3D11Buffer>             g_pUndistortVertexBuffer2;
-ComPtr<ID3D11Buffer>             g_pUndistortIndexBuffer2;
-UINT                             g_uUndistortIndexCount2 = 0;
+UINT                             g_uUndistortIndexCount[2] = { 0, 0 };
 
 void Resize(UINT width, UINT height)
 {
@@ -51,60 +47,45 @@ void Resize(UINT width, UINT height)
     }
 }
 
-void UpdateMeshes(SharedMemoryData& sharedMemoryData, float zoomFactor) {
-    // Camera 1
-    CameraParameters cam_params;
-    CameraIntrinsics cam_intrinsics;
-    if (!get_distortion_config(sharedMemoryData, 0, cam_params, cam_intrinsics)) {
-        return;
+void UpdateMeshes(SharedMemoryData& sharedMemoryData, float zoomFactor, bool useDistortion) {
+    for (int i = 0; i < 2; ++i) {
+        std::vector<UndistortVertex> vertices;
+        std::vector<DWORD> indices;
+
+        if (useDistortion)
+        {
+            CameraParameters cam_params;
+            CameraIntrinsics cam_intrinsics;
+            if (!get_distortion_config(sharedMemoryData, i, cam_params, cam_intrinsics)) {
+                continue;
+            }
+    
+            
+            create_undistortion_mesh(1016, 1016, zoomFactor, cam_intrinsics, cam_params, vertices, indices);
+        }
+        else
+        {
+            create_default_mesh(vertices, indices);
+        }
+
+        g_uUndistortIndexCount[i] = static_cast<UINT>(indices.size());
+
+        g_pUndistortVertexBuffer[i].Reset();
+        g_pUndistortIndexBuffer[i].Reset();
+
+        D3D11_BUFFER_DESC bd = {};
+        bd.Usage = D3D11_USAGE_DEFAULT;
+        bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        bd.ByteWidth = sizeof(UndistortVertex) * (UINT)vertices.size();
+        D3D11_SUBRESOURCE_DATA InitData = {};
+        InitData.pSysMem = vertices.data();
+        g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pUndistortVertexBuffer[i]);
+
+        bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        bd.ByteWidth = sizeof(DWORD) * (UINT)indices.size();
+        InitData.pSysMem = indices.data();
+        g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pUndistortIndexBuffer[i]);
     }
-
-    std::vector<UndistortVertex> vertices;
-    std::vector<DWORD> indices;
-    create_undistortion_mesh(1016, 1016, zoomFactor, cam_intrinsics, cam_params, vertices, indices);
-    g_uUndistortIndexCount = static_cast<UINT>(indices.size());
-
-    g_pUndistortVertexBuffer.Reset();
-    g_pUndistortIndexBuffer.Reset();
-
-    D3D11_BUFFER_DESC bd = {};
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bd.ByteWidth = sizeof(UndistortVertex) * (UINT)vertices.size();
-    D3D11_SUBRESOURCE_DATA InitData = {};
-    InitData.pSysMem = vertices.data();
-    g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pUndistortVertexBuffer);
-
-    bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    bd.ByteWidth = sizeof(DWORD) * (UINT)indices.size();
-    InitData.pSysMem = indices.data();
-    g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pUndistortIndexBuffer);
-
-    // Camera 2
-    CameraParameters cam_params2;
-    CameraIntrinsics cam_intrinsics2;
-    if (!get_distortion_config(sharedMemoryData, 1, cam_params2, cam_intrinsics2)) {
-        return;
-    }
-
-    std::vector<UndistortVertex> vertices2;
-    std::vector<DWORD> indices2;
-    create_undistortion_mesh(1016, 1016, zoomFactor, cam_intrinsics2, cam_params2, vertices2, indices2);
-    g_uUndistortIndexCount2 = static_cast<UINT>(indices2.size());
-
-    g_pUndistortVertexBuffer2.Reset();
-    g_pUndistortIndexBuffer2.Reset();
-
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bd.ByteWidth = sizeof(UndistortVertex) * (UINT)vertices2.size();
-    InitData.pSysMem = vertices2.data();
-    g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pUndistortVertexBuffer2);
-
-    bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    bd.ByteWidth = sizeof(DWORD) * (UINT)indices2.size();
-    InitData.pSysMem = indices2.data();
-    g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pUndistortIndexBuffer2);
 }
 
 HRESULT InitDevice(HWND hWnd, SharedMemoryData& sharedMemoryData, float zoomFactor) {
@@ -267,32 +248,32 @@ void Render(SharedMemoryData& sharedMemoryData) {
         vp.TopLeftX = 0;
         g_pImmediateContext->RSSetViewports(1, &vp);
         g_pImmediateContext->PSSetShaderResources(0, 1, g_pBC4TextureSRV1.GetAddressOf());
-        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer.GetAddressOf(), &stride, &offset);
-        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount, 0, 0);
+        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer[0].GetAddressOf(), &stride, &offset);
+        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer[0].Get(), DXGI_FORMAT_R32_UINT, 0);
+        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount[0], 0, 0);
     } else if (g_displayMode == DisplayMode::Camera2) {
         vp.TopLeftX = 0;
         g_pImmediateContext->RSSetViewports(1, &vp);
         g_pImmediateContext->PSSetShaderResources(0, 1, g_pBC4TextureSRV2.GetAddressOf());
-        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer2.GetAddressOf(), &stride, &offset);
-        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer2.Get(), DXGI_FORMAT_R32_UINT, 0);
-        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount2, 0, 0);
+        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer[1].GetAddressOf(), &stride, &offset);
+        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer[1].Get(), DXGI_FORMAT_R32_UINT, 0);
+        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount[1], 0, 0);
     } else { // SideBySide
         // Draw left camera
         vp.TopLeftX = 0;
         g_pImmediateContext->RSSetViewports(1, &vp);
         g_pImmediateContext->PSSetShaderResources(0, 1, g_pBC4TextureSRV1.GetAddressOf());
-        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer.GetAddressOf(), &stride, &offset);
-        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount, 0, 0);
+        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer[0].GetAddressOf(), &stride, &offset);
+        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer[0].Get(), DXGI_FORMAT_R32_UINT, 0);
+        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount[0], 0, 0);
 
         // Draw right camera
         vp.TopLeftX = window_width / 2.0f;
         g_pImmediateContext->RSSetViewports(1, &vp);
         g_pImmediateContext->PSSetShaderResources(0, 1, g_pBC4TextureSRV2.GetAddressOf());
-        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer2.GetAddressOf(), &stride, &offset);
-        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer2.Get(), DXGI_FORMAT_R32_UINT, 0);
-        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount2, 0, 0);
+        g_pImmediateContext->IASetVertexBuffers(0, 1, g_pUndistortVertexBuffer[1].GetAddressOf(), &stride, &offset);
+        g_pImmediateContext->IASetIndexBuffer(g_pUndistortIndexBuffer[1].Get(), DXGI_FORMAT_R32_UINT, 0);
+        g_pImmediateContext->DrawIndexed(g_uUndistortIndexCount[1], 0, 0);
     }
 
     g_pSwapChain->Present(1, 0);
@@ -304,10 +285,8 @@ void CleanupDevice() {
     g_pUndistortInputLayout.Reset();
     g_pUndistortPixelShader.Reset();
     g_pUndistortVertexShader.Reset();
-    g_pUndistortIndexBuffer.Reset();
-    g_pUndistortVertexBuffer.Reset();
-    g_pUndistortIndexBuffer2.Reset();
-    g_pUndistortVertexBuffer2.Reset();
+    g_pUndistortIndexBuffer[0].Reset(); g_pUndistortIndexBuffer[1].Reset();
+    g_pUndistortVertexBuffer[0].Reset(); g_pUndistortVertexBuffer[1].Reset();
     g_pSamplerState.Reset();
     g_pBC4TextureSRV1.Reset();
     g_pBC4Texture1.Reset();
