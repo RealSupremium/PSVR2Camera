@@ -13,6 +13,6 @@ This is a simple Windows app for viewing the raw camera feeds from the PSVR2 hea
 -   **`1`**: Switch to the left camera view.
 -   **`2`**: Switch to the right camera view.
 -   **`3`**: Switch to the side-by-side view.
--   **`+`**: Zoom in.
--   **`-`**: Zoom out.
+-   **`+`**: Increase undistorted FOV (zoom out).
+-   **`-`**: Decrease undistorted FOV (zoom in).
 -   **`D`**: Toggle distortion.
